@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <title>Basit Veri Sistemi</title>
+    <!-- Appwrite Web SDK'sını çekiyoruz -->
+    <script src="https://cdn.jsdelivr.net/npm/appwrite@13.0.0"></script>
+    <style>
+        body { font-family: sans-serif; padding: 20px; max-width: 400px; }
+        input, button, textarea { width: 100%; margin-bottom: 10px; padding: 10px; }
+        .gizli { display: none; }
+    </style>
+</head>
+<body>
+
+    <h2>Sisteme Giriş</h2>
+
+    <!-- GİRİŞ/KAYIT EKRANI -->
+    <div id="girisEkrani">
+        <input type="email" id="email" placeholder="E-posta adresiniz">
+        <input type="password" id="sifre" placeholder="Şifreniz (En az 8 karakter)">
+        <button onclick="kayitOl()">Kayıt Ol</button>
+        <button onclick="girisYap()">Giriş Yap</button>
+    </div>
+
+    <!-- VERİ EKLEME EKRANI (Başlangıçta gizli) -->
+    <div id="veriEkrani" class="gizli">
+        <h3>Yeni Fikir Ekle</h3>
+        <textarea id="veriIcerigi" placeholder="Buraya kaydedilecek metni yazın..."></textarea>
+        <button onclick="veriKaydet()">Kaydet</button>
+        
+        <h3>Kaydedilenler:</h3>
+        <ul id="veriListesi"></ul>
+        <button onclick="cikisYap()" style="background: red; color: white;">Çıkış Yap</button>
+    </div>
+
+    <script>
+        // 1. Appwrite Kurulumu
+        const { Client, Account, Databases, ID } = Appwrite;
+        
+        const client = new Client()
+            .setEndpoint('https://cloud.appwrite.io/v1') // Kendi sunucunuzsa adresi değiştirin
+            .setProject('SENIN_PROJE_IDN'); // BURAYI DEĞİŞTİR
+
+        const account = new Account(client);
+        const databases = new Databases(client);
+
+        const dbId = 'SENIN_VERITABANI_IDN';       // BURAYI DEĞİŞTİR
+        const collectionId = 'SENIN_KOLEKSIYON_IDN'; // BURAYI DEĞİŞTİR
+
+        // 2. Kullanıcı İşlemleri
+        async function kayitOl() {
+            const email = document.getElementById('email').value;
+            const sifre = document.getElementById('sifre').value;
+            try {
+                await account.create(ID.unique(), email, sifre);
+                alert("Kayıt başarılı! Şimdi giriş yapabilirsiniz.");
+            } catch (error) { alert("Hata: " + error.message); }
+        }
+
+        async function girisYap() {
+            const email = document.getElementById('email').value;
+            const sifre = document.getElementById('sifre').value;
+            try {
+                await account.createEmailSession(email, sifre);
+                ekraniDegistir(true);
+                verileriGetir(); // Giriş yapınca verileri ekrana yükle
+            } catch (error) { alert("Giriş Hatası: " + error.message); }
+        }
+
+        async function cikisYap() {
+            try {
+                await account.deleteSession('current');
+                ekraniDegistir(false);
+            } catch (error) { alert("Çıkış Hatası: " + error.message); }
+        }
+
+        // 3. Veritabanı İşlemleri (Veri Alışverişi)
+        async function veriKaydet() {
+            const icerik = document.getElementById('veriIcerigi').value;
+            if(!icerik) return alert("Boş veri kaydedilemez!");
+
+            try {
+                await databases.createDocument(dbId, collectionId, ID.unique(), {
+                    icerik: icerik
+                });
+                document.getElementById('veriIcerigi').value = ""; // Kutuyu temizle
+                verileriGetir(); // Listeyi güncelle
+            } catch (error) { alert("Kaydetme Hatası: " + error.message); }
+        }
+
+        async function verileriGetir() {
+            const liste = document.getElementById('veriListesi');
+            liste.innerHTML = "Yükleniyor...";
+            try {
+                const response = await databases.listDocuments(dbId, collectionId);
+                liste.innerHTML = ""; // Listeyi temizle
+                response.documents.forEach(doc => {
+                    liste.innerHTML += `<li>${doc.icerik}</li>`;
+                });
+            } catch (error) { console.log(error); }
+        }
+
+        // Arayüz Kontrolü
+        function ekraniDegistir(girisYapildiMi) {
+            if(girisYapildiMi) {
+                document.getElementById('girisEkrani').classList.add('gizli');
+                document.getElementById('veriEkrani').classList.remove('gizli');
+            } else {
+                document.getElementById('girisEkrani').classList.remove('gizli');
+                document.getElementById('veriEkrani').classList.add('gizli');
+            }
+        }
+    </script>
+</body>
+</html>
